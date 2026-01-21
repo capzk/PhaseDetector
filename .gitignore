@@ -1,0 +1,21 @@
+
+
+# Windows Zone.Identifier 文件
+*:Zone.Identifier
+
+# 临时文件
+*.tmp
+*.bak
+*~
+.DS_Store
+
+# 发布目录
+Release/
+prod/
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
