@@ -174,6 +174,11 @@ function PhaseDetector:UpdatePhaseInfo()
         return
     end
     
+    -- 在战场和副本中禁用功能
+    if C_PvP.IsInBrawl() or C_PvP.IsRatedMap() or C_PvP.IsActiveBattlefield() or IsInInstance() then
+        return
+    end
+    
     local mapID, mapName = self:GetCurrentMapInfo()
     if not mapID or not mapName then
         return

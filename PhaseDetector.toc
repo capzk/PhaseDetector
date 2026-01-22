@@ -8,7 +8,7 @@
 ## Notes-zhTW: 簡單的魔獸世界位面變化檢測和通知插件。命令：/phd、/phd on、/phd off。
 ## Notes-ruRU: Простой аддон для обнаружения и уведомления об изменениях фаз в World of Warcraft. Команды: /phd, /phd on, /phd off.
 ## Author: capzk
-## Version: 1.0.5
+## Version: 1.0.6
 ## DefaultState: enabled
 ## LoadOnDemand: 0
 
