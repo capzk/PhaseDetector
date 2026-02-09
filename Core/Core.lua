@@ -5,7 +5,7 @@ local PhaseDetector = {}
 _G[ADDON_NAME] = PhaseDetector
 
 -- 全局变量
-PhaseDetector.version = "1.0.0"
+PhaseDetector.version = "1.1.0"
 PhaseDetector.loaded = false
 PhaseDetector.db = nil
 
@@ -34,10 +34,6 @@ function PhaseDetector:Initialize()
     end
     
     self.loaded = true
-    
-    local L = PhaseDetector.L or {}
-    local loadedText = L["AddonLoaded"] or "PhaseDetector v%s loaded"
-    print(string.format(loadedText, self.version))
 end
 
 -- 事件处理

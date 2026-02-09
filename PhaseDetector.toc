@@ -3,12 +3,13 @@
 ## Title-zhCN: 位面检测器
 ## Title-zhTW: 位面檢測器
 ## Title-ruRU: Детектор Фаз
-## Notes: A simple addon to detect and announce phase changes in World of Warcraft. Commands: /phd, /phd on, /phd off.
-## Notes-zhCN: 简单的魔兽世界位面变化检测和通知插件。命令：/phd、/phd on、/phd off。
-## Notes-zhTW: 簡單的魔獸世界位面變化檢測和通知插件。命令：/phd、/phd on、/phd off。
+## Notes: A simple addon to detect and announce phase changes in World of Warcraft. Commands: /phd.
+## Notes-zhCN: 简单的魔兽世界位面变化检测和通知插件。命令：/phd。
+## Notes-zhTW: 簡單的魔獸世界位面變化檢測和通知插件。命令：/phd。
 ## Notes-ruRU: Простой аддон для обнаружения и уведомления об изменениях фаз в World of Warcraft. Команды: /phd, /phd on, /phd off.
 ## Author: capzk
-## Version: 1.0.6
+## Version: 1.1.0
+## IconTexture: Interface\Icons\inv_12_dualityphoenix_lightvoid_channel
 ## DefaultState: enabled
 ## LoadOnDemand: 0
 
