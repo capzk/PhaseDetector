@@ -9,6 +9,9 @@ on:
       - '**.toc'
       - '**.md'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -22,14 +25,15 @@ jobs:
       - name: Extract version from TOC
         id: get_version
         run: |
-          VERSION=$(grep "## Version:" PhaseDetector.toc | sed 's/## Version: //' | tr -d '\r')
+          VERSION=$(grep "## Version:" PhaseDetector.toc | sed 's/## Version: //' | tr -d '\r' | xargs)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
 
       - name: Check if release exists
         id: check_release
+        continue-on-error: true
         run: |
-          if gh release view "v${{ steps.get_version.outputs.version }}" > /dev/null 2>&1; then
+          if gh release view "v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "Release v${{ steps.get_version.outputs.version }} exists"
           else
@@ -37,15 +41,19 @@ jobs:
             echo "Release v${{ steps.get_version.outputs.version }} does not exist"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
 
       - name: Delete existing release
         if: steps.check_release.outputs.exists == 'true'
+        continue-on-error: true
         run: |
-          gh release delete "v${{ steps.get_version.outputs.version }}" --yes
-          git push --delete origin "v${{ steps.get_version.outputs.version }}" || true
+          gh release delete "v${{ steps.get_version.outputs.version }}" --yes --cleanup-tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Wait for tag deletion
+        if: steps.check_release.outputs.exists == 'true'
+        run: sleep 5
 
       - name: Create addon package
         run: |
@@ -53,7 +61,12 @@ jobs:
           mkdir -p package/PhaseDetector
           
           # Copy addon files (exclude .git and .github)
-          cp -r Core Locales Modules *.toc *.md package/PhaseDetector/ 2>/dev/null || true
+          cp -r Core Locales Modules PhaseDetector.toc package/PhaseDetector/
+          
+          # Copy README if exists
+          if [ -f README.md ]; then
+            cp README.md package/PhaseDetector/
+          fi
           
           # Create zip file with version number
           cd package
@@ -64,7 +77,7 @@ jobs:
           ls -lh "PhaseDetector-${{ steps.get_version.outputs.version }}.zip"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.get_version.outputs.version }}
           name: PhaseDetector v${{ steps.get_version.outputs.version }}
