@@ -1,0 +1,92 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.lua'
+      - '**.toc'
+      - '**.md'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from TOC
+        id: get_version
+        run: |
+          VERSION=$(grep "## Version:" PhaseDetector.toc | sed 's/## Version: //' | tr -d '\r')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Check if release exists
+        id: check_release
+        run: |
+          if gh release view "v${{ steps.get_version.outputs.version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release v${{ steps.get_version.outputs.version }} exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release v${{ steps.get_version.outputs.version }} does not exist"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete existing release
+        if: steps.check_release.outputs.exists == 'true'
+        run: |
+          gh release delete "v${{ steps.get_version.outputs.version }}" --yes
+          git push --delete origin "v${{ steps.get_version.outputs.version }}" || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create addon package
+        run: |
+          # Create temporary directory for packaging
+          mkdir -p package/PhaseDetector
+          
+          # Copy addon files (exclude .git and .github)
+          cp -r Core Locales Modules *.toc *.md package/PhaseDetector/ 2>/dev/null || true
+          
+          # Create zip file with version number
+          cd package
+          zip -r "../PhaseDetector-${{ steps.get_version.outputs.version }}.zip" PhaseDetector/
+          cd ..
+          
+          echo "Package created: PhaseDetector-${{ steps.get_version.outputs.version }}.zip"
+          ls -lh "PhaseDetector-${{ steps.get_version.outputs.version }}.zip"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: PhaseDetector v${{ steps.get_version.outputs.version }}
+          body: |
+            ## PhaseDetector v${{ steps.get_version.outputs.version }}
+            
+            ### Installation
+            1. Download `PhaseDetector-${{ steps.get_version.outputs.version }}.zip`
+            2. Extract to your `World of Warcraft/_retail_/Interface/AddOns/` directory
+            3. Restart WoW or reload UI with `/reload`
+            
+            ### Changes
+            See commit history for details.
+          files: |
+            PhaseDetector-${{ steps.get_version.outputs.version }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf package
+          rm -f PhaseDetector-*.zip

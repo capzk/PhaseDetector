@@ -14,6 +14,7 @@ PhaseDetector.phaseCache = {}
 PhaseDetector.isRunning = false
 PhaseDetector.phaseFrame = nil
 PhaseDetector.eventFrame = nil
+PhaseDetector.isPaused = false  -- 新增：暂停状态标记
 
 -- 性能优化：缓存上次检测的 GUID，避免重复处理相同目标
 PhaseDetector.lastTargetGUID = nil
@@ -81,6 +82,7 @@ function PhaseDetector:Initialize()
     self.lastSeenMapID = nil
     self.lastTargetGUID = nil
     self.lastMouseoverGUID = nil
+    self.isPaused = false
 
     self:CreatePhaseDisplay()
 end
@@ -274,13 +276,13 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
             return
         end
         
-        -- 在战斗中禁用功能，避免触发秘密值保护
-        if InCombatLockdown() then
+        -- 如果已暂停，直接返回（在受限环境中）
+        if self.isPaused then
             return
         end
         
-        -- 在战场和副本中禁用功能
-        if IsInRestrictedEnvironment() then
+        -- 在战斗中禁用功能，避免触发秘密值保护
+        if InCombatLockdown() then
             return
         end
         
@@ -350,6 +352,41 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
     end
 end
 
+-- 暂停检测（进入受限环境时）
+function PhaseDetector:PauseDetection()
+    if self.isPaused then
+        return
+    end
+    
+    self.isPaused = true
+    
+    -- 隐藏悬浮窗
+    if self.phaseFrame then
+        self.phaseFrame:Hide()
+    end
+    
+    -- 清理缓存
+    self.lastTargetGUID = nil
+    self.lastMouseoverGUID = nil
+end
+
+-- 恢复检测（离开受限环境时）
+function PhaseDetector:ResumeDetection()
+    if not self.isPaused then
+        return
+    end
+    
+    self.isPaused = false
+    
+    -- 清理缓存，强制重新检测
+    self.phaseCache = {}
+    self.lastReportedMapID = nil
+    self.lastReportedPhaseID = nil
+    self.lastSeenMapID = nil
+    self.lastTargetGUID = nil
+    self.lastMouseoverGUID = nil
+end
+
 -- 开始位面检测
 function PhaseDetector:StartDetection()
     if self.isRunning then
@@ -360,18 +397,41 @@ function PhaseDetector:StartDetection()
     end
     
     self.isRunning = true
+    self.isPaused = false
     
     if not self.eventFrame then
         self.eventFrame = CreateFrame("Frame")
         -- 性能优化：事件处理函数传递事件类型
         self.eventFrame:SetScript("OnEvent", function(_, event)
-            self:UpdatePhaseInfo(event)
+            if event == "PLAYER_ENTERING_WORLD" then
+                -- 区域切换时检查环境
+                self:CheckEnvironment()
+            else
+                self:UpdatePhaseInfo(event)
+            end
         end)
     end
     
-    -- 只注册必要的事件，完全事件驱动
+    -- 注册必要的事件
     self.eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     self.eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+    self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")  -- 监听区域切换
+    
+    -- 启动时立即检查环境
+    self:CheckEnvironment()
+end
+
+-- 检查当前环境并决定是否暂停
+function PhaseDetector:CheckEnvironment()
+    if IsInRestrictedEnvironment() then
+        if not self.isPaused then
+            self:PauseDetection()
+        end
+    else
+        if self.isPaused then
+            self:ResumeDetection()
+        end
+    end
 end
 
 -- 停止位面检测
@@ -381,10 +441,12 @@ function PhaseDetector:StopDetection()
     end
     
     self.isRunning = false
+    self.isPaused = false
     
     if self.eventFrame then
         self.eventFrame:UnregisterEvent("UPDATE_MOUSEOVER_UNIT")
         self.eventFrame:UnregisterEvent("PLAYER_TARGET_CHANGED")
+        self.eventFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
     end
 
     -- 清理缓存
