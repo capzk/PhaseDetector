@@ -51,26 +51,6 @@ local EXCLUDED_PLAYER_MOUNT_NPC_IDS = {
     [142668] = true,  -- Merchant Maku
 }
 
-local function GetCreatureIDFromGUID(guid)
-    if not guid then
-        return nil
-    end
-
-    if C_GUIDUtil_GetCreatureID then
-        local creatureID = C_GUIDUtil_GetCreatureID(guid)
-        if creatureID then
-            return tonumber(creatureID)
-        end
-    end
-
-    local _, _, _, _, _, npcID = strsplit("-", guid)
-    if not npcID then
-        return nil
-    end
-
-    return tonumber(npcID)
-end
-
 -- 安全检查：是否在受限环境中（副本、战场、竞技场等）
 local function IsInRestrictedEnvironment()
     -- 检查是否在副本中
@@ -125,12 +105,19 @@ function PhaseDetector:GetPhaseFromGUID(guid)
         return nil
     end
 
-    local unitType, _, shardID, instancePart = strsplit("-", guid)
+    local unitType, _, shardID, instancePart, _, npcID = strsplit("-", guid)
     if not unitType then
         return nil
     end
 
-    local numericNpcID = GetCreatureIDFromGUID(guid)
+    local numericNpcID = nil
+    if C_GUIDUtil_GetCreatureID then
+        numericNpcID = tonumber(C_GUIDUtil_GetCreatureID(guid))
+    end
+    if not numericNpcID and npcID then
+        numericNpcID = tonumber(npcID)
+    end
+
     if numericNpcID and EXCLUDED_PLAYER_MOUNT_NPC_IDS[numericNpcID] then
         return nil
     end
@@ -293,9 +280,9 @@ function PhaseDetector:AnnouncePhase(mapName, phaseID, isFirstTime)
     local L = addon.L or {}
     local template
     if isFirstTime then
-        template = L["PhaseDetectedFirstTime"] or "Phase detected in %s: %s"
+        template = L["PhaseDetectedFirstTime"] or "Current phase in %s is: %s"
     else
-        template = L["PhaseChanged"] or "Phase changed in %s: %s"
+        template = L["PhaseChanged"] or "Current phase in %s has changed to: %s"
     end
 
     local message = string.format(template, mapName, phaseID)
@@ -332,8 +319,11 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
         return
     end
 
+    -- 使用稳定地图键避免同名子地图(mapID抖动)导致重复首次通知
+    local mapKey = mapName or tostring(mapID)
+
     -- 地图切换时清理缓存
-    if self.lastSeenMapID and self.lastSeenMapID ~= mapID then
+    if self.lastSeenMapID and self.lastSeenMapID ~= mapKey then
         self.phaseCache = {}
         self.lastReportedMapID = nil
         self.lastReportedPhaseID = nil
@@ -353,8 +343,8 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
         return
     end
 
-    local cachedPhaseID = self.phaseCache[mapID]
-    local mapChanged = self.lastSeenMapID ~= mapID
+    local cachedPhaseID = self.phaseCache[mapKey]
+    local mapChanged = self.lastSeenMapID ~= mapKey
     local shouldAnnounce = false
     local isFirstTime = false
 
@@ -366,19 +356,19 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
         isFirstTime = (cachedPhaseID == nil)
     end
 
-    self.phaseCache[mapID] = detectedPhaseID
-    self.lastSeenMapID = mapID
+    self.phaseCache[mapKey] = detectedPhaseID
+    self.lastSeenMapID = mapKey
     self:UpdatePhaseDisplay(detectedPhaseID)
 
     if shouldAnnounce then
         -- 避免重复通知相同的地图和位面组合
-        local mapPhaseKey = mapID .. "-" .. detectedPhaseID
+        local mapPhaseKey = mapKey .. "-" .. detectedPhaseID
         local lastReportedKey = (self.lastReportedMapID and self.lastReportedPhaseID) and 
                                 (self.lastReportedMapID .. "-" .. self.lastReportedPhaseID) or nil
 
         if lastReportedKey ~= mapPhaseKey then
             self:AnnouncePhase(mapName, detectedPhaseID, isFirstTime)
-            self.lastReportedMapID = mapID
+            self.lastReportedMapID = mapKey
             self.lastReportedPhaseID = detectedPhaseID
         end
     end
@@ -442,7 +432,6 @@ function PhaseDetector:StartDetection()
                 -- 战斗结束后清理单位缓存，允许在同目标上重新检测
                 self.lastTargetGUID = nil
                 self.lastMouseoverGUID = nil
-                self:CheckEnvironment()
                 self:UpdatePhaseInfo("PLAYER_TARGET_CHANGED")
                 self:UpdatePhaseInfo("UPDATE_MOUSEOVER_UNIT")
             else

@@ -6,11 +6,8 @@ local PhaseDetector = _G[ADDON_NAME]
 if PhaseDetector and PhaseDetector.Locales then
     PhaseDetector.Locales:Register("zhTW", {
         -- 位面检测消息
-        ["PhaseDetectedFirstTime"] = "檢測到%s的位面：%s",
-        ["PhaseChanged"] = "%s的位面已變更為：%s",
-        ["AddonLoaded"] = "PhaseDetector v%s 載入完成",
-        ["DetectorInitialized"] = "位面檢測器初始化完成",
-        ["DetectionStarted"] = "位面檢測已啟動",
+        ["PhaseDetectedFirstTime"] = "當前%s的位面是：%s",
+        ["PhaseChanged"] = "當前%s的位面已變更為：%s",
         ["DetectionStopped"] = "位面檢測已停止",
         
         -- 提示信息

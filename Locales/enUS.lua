@@ -6,11 +6,8 @@ local PhaseDetector = _G[ADDON_NAME]
 if PhaseDetector and PhaseDetector.Locales then
     PhaseDetector.Locales:Register("enUS", {
         -- 位面检测消息
-        ["PhaseDetectedFirstTime"] = "Phase detected in %s: %s",
-        ["PhaseChanged"] = "Phase changed in %s: %s",
-        ["AddonLoaded"] = "PhaseDetector v%s loaded",
-        ["DetectorInitialized"] = "PhaseDetector initialized",
-        ["DetectionStarted"] = "PhaseDetector detection started",
+        ["PhaseDetectedFirstTime"] = "Current phase in %s is: %s",
+        ["PhaseChanged"] = "Current phase in %s has changed to: %s",
         ["DetectionStopped"] = "PhaseDetector detection stopped",
         
         -- 提示信息

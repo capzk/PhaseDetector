@@ -6,11 +6,8 @@ local PhaseDetector = _G[ADDON_NAME]
 if PhaseDetector and PhaseDetector.Locales then
     PhaseDetector.Locales:Register("ruRU", {
         -- Phase detection messages
-        ["PhaseDetectedFirstTime"] = "Фаза обнаружена в %s: %s",
-        ["PhaseChanged"] = "Фаза изменена в %s: %s",
-        ["AddonLoaded"] = "PhaseDetector v%s загружен",
-        ["DetectorInitialized"] = "PhaseDetector инициализирован",
-        ["DetectionStarted"] = "PhaseDetector: обнаружение запущено",
+        ["PhaseDetectedFirstTime"] = "Текущая фаза в %s: %s",
+        ["PhaseChanged"] = "Текущая фаза в %s изменена на: %s",
         ["DetectionStopped"] = "PhaseDetector: обнаружение остановлено",
 
         -- Status messages
