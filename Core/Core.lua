@@ -4,8 +4,18 @@ local ADDON_NAME = "PhaseDetector"
 local PhaseDetector = {}
 _G[ADDON_NAME] = PhaseDetector
 
+local function GetAddonVersion()
+    if C_AddOns and C_AddOns.GetAddOnMetadata then
+        return C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")
+    end
+    if GetAddOnMetadata then
+        return GetAddOnMetadata(ADDON_NAME, "Version")
+    end
+    return nil
+end
+
 -- 全局变量
-PhaseDetector.version = "1.1.0"
+PhaseDetector.version = GetAddonVersion() or "unknown"
 PhaseDetector.loaded = false
 PhaseDetector.db = nil
 
@@ -58,7 +68,7 @@ end)
 SLASH_PHASEDETECTOR1 = "/phd"
 SLASH_PHASEDETECTOR2 = "/phasedetector"
 SlashCmdList["PHASEDETECTOR"] = function(msg)
-    local command = string.lower(msg or "")
+    local command = string.lower((msg and msg:match("^%s*(%S+)")) or "")
 
     if not PhaseDetector.loaded then
         PhaseDetector:Initialize()
