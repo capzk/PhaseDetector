@@ -15,6 +15,7 @@ PhaseDetector.isRunning = false
 PhaseDetector.phaseFrame = nil
 PhaseDetector.eventFrame = nil
 PhaseDetector.isPaused = false  -- 新增：暂停状态标记
+PhaseDetector.lastDisplayedPhaseID = nil
 
 -- 性能优化：缓存上次检测的 GUID，避免重复处理相同目标
 PhaseDetector.lastTargetGUID = nil
@@ -96,6 +97,7 @@ function PhaseDetector:Initialize()
     self.lastTargetGUID = nil
     self.lastMouseoverGUID = nil
     self.isPaused = false
+    self.lastDisplayedPhaseID = nil
 
     self:CreatePhaseDisplay()
 end
@@ -105,7 +107,7 @@ function PhaseDetector:GetPhaseFromGUID(guid)
         return nil
     end
 
-    local unitType, _, shardID, instancePart, _, npcID = strsplit("-", guid)
+    local unitType, _, serverID, _, zoneUID, npcID = strsplit("-", guid)
     if not unitType then
         return nil
     end
@@ -122,9 +124,9 @@ function PhaseDetector:GetPhaseFromGUID(guid)
         return nil
     end
     
-    -- 位面ID = 分片ID-实例ID（GUID第3-4部分）
-    if unitType == "Creature" and shardID and instancePart then
-        return shardID .. "-" .. instancePart
+    -- 位面ID = ServerID-ZoneUID（GUID第3和第5部分）
+    if unitType == "Creature" and serverID and zoneUID then
+        return serverID .. "-" .. zoneUID
     end
 
     return nil
@@ -139,14 +141,9 @@ function PhaseDetector:GetPhaseFromTarget()
         return nil
     end
 
-    local phaseID = self:GetPhaseFromGUID(guid)
-    if phaseID then
-        self.lastTargetGUID = guid
-    elseif not guid then
-        self.lastTargetGUID = nil
-    end
-
-    return phaseID
+    -- 无论是否可解析，都记录最新 GUID，避免“不可解析单位 -> 原NPC”漏检
+    self.lastTargetGUID = guid
+    return self:GetPhaseFromGUID(guid)
 end
 
 -- 性能优化：只在鼠标指向变化时获取位面ID
@@ -158,14 +155,9 @@ function PhaseDetector:GetPhaseFromMouseover()
         return nil
     end
 
-    local phaseID = self:GetPhaseFromGUID(guid)
-    if phaseID then
-        self.lastMouseoverGUID = guid
-    elseif not guid then
-        self.lastMouseoverGUID = nil
-    end
-
-    return phaseID
+    -- 无论是否可解析，都记录最新 GUID，避免“不可解析单位 -> 原NPC”漏检
+    self.lastMouseoverGUID = guid
+    return self:GetPhaseFromGUID(guid)
 end
 
 
@@ -224,20 +216,33 @@ function PhaseDetector:UpdatePhaseDisplay(phaseID)
         return
     end
 
+    if not phaseID then
+        self.lastDisplayedPhaseID = nil
+        if self.phaseFrame:IsShown() then
+            self.phaseFrame:Hide()
+        end
+        return
+    end
+
     -- 在战斗中跳过 UI 更新，避免潜在的保护问题
     if InCombatLockdown() then
         return
     end
 
-    if not phaseID then
-        self.phaseFrame:Hide()
+    if self.lastDisplayedPhaseID == phaseID and self.phaseFrame:IsShown() then
         return
     end
 
     local L = addon.L or {}
-    local line = string.format(L["ScreenPhaseID"] or "Phase ID: %s", phaseID)
-    self.phaseFrame.text:SetText(line)
-    self.phaseFrame:Show()
+    if self.lastDisplayedPhaseID ~= phaseID then
+        local line = string.format(L["ScreenPhaseID"] or "Phase ID: %s", phaseID)
+        self.phaseFrame.text:SetText(line)
+        self.lastDisplayedPhaseID = phaseID
+    end
+
+    if not self.phaseFrame:IsShown() then
+        self.phaseFrame:Show()
+    end
 end
 
 
@@ -319,8 +324,8 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
         return
     end
 
-    -- 使用稳定地图键避免同名子地图(mapID抖动)导致重复首次通知
-    local mapKey = mapName or tostring(mapID)
+    -- 直接使用 mapID 作为缓存键，避免同名地图冲突与字符串分配
+    local mapKey = mapID
 
     -- 地图切换时清理缓存
     if self.lastSeenMapID and self.lastSeenMapID ~= mapKey then
@@ -362,11 +367,7 @@ function PhaseDetector:UpdatePhaseInfo(eventType)
 
     if shouldAnnounce then
         -- 避免重复通知相同的地图和位面组合
-        local mapPhaseKey = mapKey .. "-" .. detectedPhaseID
-        local lastReportedKey = (self.lastReportedMapID and self.lastReportedPhaseID) and 
-                                (self.lastReportedMapID .. "-" .. self.lastReportedPhaseID) or nil
-
-        if lastReportedKey ~= mapPhaseKey then
+        if self.lastReportedMapID ~= mapKey or self.lastReportedPhaseID ~= detectedPhaseID then
             self:AnnouncePhase(mapName, detectedPhaseID, isFirstTime)
             self.lastReportedMapID = mapKey
             self.lastReportedPhaseID = detectedPhaseID
@@ -390,6 +391,7 @@ function PhaseDetector:PauseDetection()
     -- 清理缓存
     self.lastTargetGUID = nil
     self.lastMouseoverGUID = nil
+    self.lastDisplayedPhaseID = nil
 end
 
 -- 恢复检测（离开受限环境时）
@@ -407,6 +409,7 @@ function PhaseDetector:ResumeDetection()
     self.lastSeenMapID = nil
     self.lastTargetGUID = nil
     self.lastMouseoverGUID = nil
+    self.lastDisplayedPhaseID = nil
 end
 
 -- 开始位面检测
@@ -482,6 +485,7 @@ function PhaseDetector:StopDetection()
     -- 清理缓存
     self.lastTargetGUID = nil
     self.lastMouseoverGUID = nil
+    self.lastDisplayedPhaseID = nil
     self:UpdatePhaseDisplay(nil)
     
     local L = addon.L or {}

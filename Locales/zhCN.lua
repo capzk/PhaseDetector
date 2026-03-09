@@ -6,7 +6,7 @@ local PhaseDetector = _G[ADDON_NAME]
 if PhaseDetector and PhaseDetector.Locales then
     PhaseDetector.Locales:Register("zhCN", {
         -- 位面检测消息
-        ["PhaseDetectedFirstTime"] = "当前%s的位面是：%s",
+        ["PhaseDetectedFirstTime"] = "当前%s位面：%s",
         ["PhaseChanged"] = "当前%s的位面已变更为：%s",
         ["DetectionStopped"] = "位面检测已停止",
         
