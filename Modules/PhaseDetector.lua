@@ -8,6 +8,8 @@ addon.PhaseDetector = PhaseDetector
 
 PhaseDetector.isRunning = false
 PhaseDetector.eventFrame = nil
+PhaseDetector.isEnvironmentBlocked = false
+PhaseDetector.detectionEventsRegistered = false
 
 local function GetTracker()
     return addon.PhaseTracker
@@ -36,6 +38,36 @@ function PhaseDetector:HandleDetectionEvent(eventType)
     end
 end
 
+function PhaseDetector:SetDetectionEventsEnabled(enabled)
+    if not self.eventFrame then
+        return
+    end
+
+    if enabled and not self.detectionEventsRegistered then
+        self.eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+        self.eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+        self.detectionEventsRegistered = true
+    elseif not enabled and self.detectionEventsRegistered then
+        self.eventFrame:UnregisterEvent("UPDATE_MOUSEOVER_UNIT")
+        self.eventFrame:UnregisterEvent("PLAYER_TARGET_CHANGED")
+        self.detectionEventsRegistered = false
+    end
+end
+
+function PhaseDetector:TriggerImmediateDetection()
+    if self.isEnvironmentBlocked then
+        return
+    end
+
+    local tracker = GetTracker()
+    if tracker and tracker.ResetUnitCache then
+        tracker:ResetUnitCache()
+    end
+
+    self:HandleDetectionEvent("PLAYER_TARGET_CHANGED")
+    self:HandleDetectionEvent("UPDATE_MOUSEOVER_UNIT")
+end
+
 -- 开始位面检测
 function PhaseDetector:StartDetection()
     if self.isRunning then
@@ -48,51 +80,64 @@ function PhaseDetector:StartDetection()
     self.isRunning = true
 
     local tracker = GetTracker()
-    if tracker then
-        tracker.isPaused = false
+    if tracker and tracker.ResetRuntimeState then
+        tracker:ResetRuntimeState()
     end
 
     if not self.eventFrame then
         self.eventFrame = CreateFrame("Frame")
         self.eventFrame:SetScript("OnEvent", function(_, event)
-            if event == "PLAYER_ENTERING_WORLD" then
-                self:CheckEnvironment()
+            if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+                self:CheckEnvironment(false)
             elseif event == "PLAYER_REGEN_ENABLED" then
-                local activeTracker = GetTracker()
-                if activeTracker and activeTracker.ResetUnitCache then
-                    activeTracker:ResetUnitCache()
+                self:CheckEnvironment(false)
+                if self.isEnvironmentBlocked then
+                    return
                 end
-
-                self:HandleDetectionEvent("PLAYER_TARGET_CHANGED")
-                self:HandleDetectionEvent("UPDATE_MOUSEOVER_UNIT")
+                self:TriggerImmediateDetection()
             else
+                if self.isEnvironmentBlocked then
+                    return
+                end
                 self:HandleDetectionEvent(event)
             end
         end)
     end
 
-    self.eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-    self.eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
     self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self.eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     self.eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
-    self:CheckEnvironment()
+    self:CheckEnvironment(true)
 end
 
 -- 检查当前环境并决定是否暂停
-function PhaseDetector:CheckEnvironment()
+function PhaseDetector:CheckEnvironment(forceUpdate)
     local tracker = GetTracker()
     if not tracker then
         return
     end
 
-    if tracker.IsRestrictedEnvironment and tracker:IsRestrictedEnvironment() then
-        if not tracker.isPaused and tracker.PauseDetection then
-            tracker:PauseDetection()
+    local restricted = tracker.IsRestrictedEnvironment and tracker:IsRestrictedEnvironment()
+
+    if restricted then
+        if forceUpdate or not self.isEnvironmentBlocked then
+            self.isEnvironmentBlocked = true
+            self:SetDetectionEventsEnabled(false)
+            if tracker.PauseDetection then
+                tracker:PauseDetection()
+            end
         end
     else
-        if tracker.isPaused and tracker.ResumeDetection then
-            tracker:ResumeDetection()
+        if forceUpdate or self.isEnvironmentBlocked then
+            self.isEnvironmentBlocked = false
+            self:SetDetectionEventsEnabled(true)
+            if tracker.ResumeDetection then
+                tracker:ResumeDetection()
+            end
+            self:TriggerImmediateDetection()
+        elseif not self.detectionEventsRegistered then
+            self:SetDetectionEventsEnabled(true)
         end
     end
 end
@@ -104,19 +149,23 @@ function PhaseDetector:StopDetection()
     end
 
     self.isRunning = false
+    self.isEnvironmentBlocked = false
 
     local tracker = GetTracker()
     if tracker then
-        tracker.isPaused = false
-        if tracker.ResetUnitCache then
+        if tracker.ResetRuntimeState then
+            tracker:ResetRuntimeState()
+        elseif tracker.ResetUnitCache then
             tracker:ResetUnitCache()
+            tracker.isPaused = false
         end
     end
 
+    self:SetDetectionEventsEnabled(false)
+
     if self.eventFrame then
-        self.eventFrame:UnregisterEvent("UPDATE_MOUSEOVER_UNIT")
-        self.eventFrame:UnregisterEvent("PLAYER_TARGET_CHANGED")
         self.eventFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        self.eventFrame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
         self.eventFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
     end
 

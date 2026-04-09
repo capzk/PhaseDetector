@@ -189,9 +189,13 @@ local function GetCreatureIDFromUnit(unit, guid)
     return nil
 end
 
-function PhaseTracker:Initialize()
+function PhaseTracker:ResetRuntimeState()
     ResetDetectionState(self)
     self.isPaused = false
+end
+
+function PhaseTracker:Initialize()
+    self:ResetRuntimeState()
 end
 
 function PhaseTracker:IsRestrictedEnvironment()
